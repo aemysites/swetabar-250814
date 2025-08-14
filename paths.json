@@ -1,10 +1,11 @@
 {
   "mappings": [
-    "/content/aem-boilerplate/:/",
-    "/content/aem-boilerplate/configuration:/.helix/config.json",
-    "/content/aem-boilerplate/metadata:/metadata.json"
+    "/content/swetabar-250814/:/",
+    "/content/swetabar-250814/configuration:/.helix/config.json",
+    "/content/swetabar-250814/metadata:/metadata.json",
+    "/content/swetabar-250814/tools/sidekick/library:/tools/sidekick/library.json"
   ],
   "includes": [
-    "/content/aem-boilerplate/"
+    "/content/swetabar-250814/"
   ]
 }

@@ -106,17 +106,28 @@ jobs:
           mountpoint: ${{ inputs.root_mountpoint }}
           mountpoint_type: 'sharepoint'
 
+      - name: Move SharePoint content to backup folder
+        id: move-to-backup
+        uses: ./.github/actions/sta-sp-move-to-backup
+        with:
+          token: ${{ steps.azure-auth.outputs.access_token }}
+          host: ${{ fromJSON(steps.mountpoint_data.outputs.data).host }}
+          site_path: ${{ fromJSON(steps.mountpoint_data.outputs.data).site }}
+          folder_path: ${{ fromJSON(steps.mountpoint_data.outputs.data).path }}
+
       - name: Create backup branch
         id: backup
         run: |
           # Get current date and time in YYYY-MM-DD-HH-MM format
           TIMESTAMP=$(date +%Y-%m-%d-%H-%M)
           # Use provided branch name or default to backup-{timestamp}
-          BRANCH_NAME="${INPUT_BACKUP_BRANCH_NAME:-backup-$TIMESTAMP}"
+          BRANCH_NAME="${BACKUP_BRANCH_NAME:-backup-$TIMESTAMP}"
           # Create and push the backup branch
           git checkout -b $BRANCH_NAME
           git push origin $BRANCH_NAME
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+        env:
+          BACKUP_BRANCH_NAME: ${{ inputs.backup_branch_name }}
 
       - name: Determine reset commit
         id: determine_reset_commit
@@ -139,15 +150,6 @@ jobs:
           git checkout main
           git reset --hard ${{ steps.determine_reset_commit.outputs.reset_commit_sha }}
           git push origin main --force
-
-      - name: Move SharePoint content to backup folder
-        id: move-to-backup
-        uses: ./.github/actions/sta-sp-move-to-backup
-        with:
-          token: ${{ steps.azure-auth.outputs.access_token }}
-          host: ${{ fromJSON(steps.mountpoint_data.outputs.data).host }}
-          site_path: ${{ fromJSON(steps.mountpoint_data.outputs.data).site }}
-          folder_path: ${{ fromJSON(steps.mountpoint_data.outputs.data).path }}
 
       - name: Create AEMY Installation issue
         uses: actions/github-script@v7

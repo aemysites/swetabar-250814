@@ -1,0 +1,22 @@
+name: 'STA Boilerplate Converter'
+description: 'Converts boilerplate content package to use repository-specific paths and folder names'
+inputs:
+  zip_contents_path:
+    description: 'Path to the extracted import zip contents'
+    required: true
+  page_paths:
+    description: 'Comma-separated list of page paths from filter.xml'
+    required: true
+  repo_name:
+    description: 'Repository name to use for path replacement'
+    required: true
+outputs:
+  is_boilerplate:
+    description: 'Whether the package is a boilerplate that was converted'
+  converted_package_path:
+    description: 'Path to the converted content package (if conversion was needed)'
+  error_message:
+    description: 'Error message if the operation failed'
+runs:
+  using: 'node20'
+  main: 'sta-boilerplate-converter.js'

@@ -149,14 +149,26 @@ export async function run() {
       );
       core.info('✅ Upload completed successfully.');
     } else if (operation === XWALK_OPERATIONS.GET_PAGE_PATHS) {
-      // Validate the existence of the asset mapping file
-      const assetMappingPath = path.join(zipContentsPath, 'asset-mapping.json');
-      if (!fs.existsSync(assetMappingPath)
-        || !fs.statSync(assetMappingPath).isFile()) {
-        throw new Error(`Asset mapping file not found at Import zip content path: ${assetMappingPath}`);
-      }
+      // First extract content paths to check if this is a boilerplate package
+      const extractedPaths = await doExtractContentPaths(zipContentsPath);
+      const isBoilerplate = isBoilerplatePackage(extractedPaths);
 
-      await doExtractContentPaths(zipContentsPath);
+      if (isBoilerplate) {
+        core.info('Detected boilerplate package - skipping asset mapping validation');
+      } else {
+        // Check for the asset mapping file for non-boilerplate packages
+        const assetMappingPath = path.join(zipContentsPath, 'asset-mapping.json');
+        if (!fs.existsSync(assetMappingPath) || !fs.statSync(assetMappingPath).isFile()) {
+          // Create a minimal asset-mapping.json file for packages that don't have one
+          core.info(`Asset mapping file not found at ${assetMappingPath}. Creating minimal asset-mapping.json for compatibility.`);
+          const minimalAssetMapping = {
+            total: 0,
+            data: [],
+          };
+          fs.writeFileSync(assetMappingPath, JSON.stringify(minimalAssetMapping, null, 2));
+          core.info(`Created minimal asset-mapping.json at ${assetMappingPath}`);
+        }
+      }
     }
   } catch (error) {
     core.warning(`Error: XWalk operation ${operation} failed: ${error.message}`);

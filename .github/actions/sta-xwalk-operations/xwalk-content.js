@@ -37,14 +37,14 @@ function getFilterPaths(xmlString) {
 /**
  * Gets the path to the content package zip file from the specified directory.
  * @param zipContentsPath
- * @returns {string}
+ * @returns {string|null} - Returns null if no zip file found (for boilerplate content)
  */
 function getContentPackagePath(zipContentsPath) {
   // Find the first .zip file in the directory
   const files = fs.readdirSync(zipContentsPath);
   const firstZipFile = files.find((file) => file.endsWith('.zip'));
   if (!firstZipFile) {
-    throw new Error('No .zip files found in the specified directory.');
+    return null; // No zip file found - might be boilerplate content
   }
 
   // Return the first .zip file found - presumably the content package
@@ -53,6 +53,31 @@ function getContentPackagePath(zipContentsPath) {
 
 export async function doExtractContentPaths(zipContentsPath) {
   const contentPackagePath = getContentPackagePath(zipContentsPath);
+  
+  // Check if this is boilerplate content (no zip file, but META-INF directory exists)
+  const metaInfPath = path.join(zipContentsPath, 'META-INF', 'vault', 'filter.xml');
+  const isBoilerplateContent = !contentPackagePath && fs.existsSync(metaInfPath);
+  
+  if (isBoilerplateContent) {
+    core.info('✅ Detected boilerplate content - reading filter.xml directly');
+    core.setOutput('content_package_path', ''); // No zip file for boilerplate
+    
+    try {
+      const filterContent = fs.readFileSync(metaInfPath, 'utf8');
+      core.debug(`Filter XML content: ${filterContent}`);
+      const paths = getFilterPaths(filterContent);
+      core.setOutput('page_paths', paths);
+      core.info(`✅ Extracted ${paths.length} page paths from boilerplate content: ${paths.join(', ')}`);
+      return paths;
+    } catch (error) {
+      throw new Error(`Error reading filter.xml from boilerplate content: ${error.message}`);
+    }
+  }
+  
+  if (!contentPackagePath) {
+    throw new Error('No .zip files found in the specified directory and no boilerplate content detected.');
+  }
+  
   core.info(`✅ Content Package Path: ${contentPackagePath}`);
   core.setOutput('content_package_path', contentPackagePath);
 
@@ -70,7 +95,7 @@ export async function doExtractContentPaths(zipContentsPath) {
               core.debug(`Filter XML content: ${data}`);
               const paths = getFilterPaths(data);
               core.setOutput('page_paths', paths);
-              resolve();
+              resolve(paths);
             }
           });
         })

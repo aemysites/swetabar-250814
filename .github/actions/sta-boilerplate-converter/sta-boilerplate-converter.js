@@ -61,27 +61,52 @@ function isBoilerplatePackage(paths) {
 function convertBoilerplatePaths(filterXmlContent, repoName) {
   core.info(`Converting boilerplate paths for repository: ${repoName}`);
 
-  return filterXmlContent.replace(
+  let modifiedContent = filterXmlContent;
+
+  // Handle multiple XML formats
+  const patterns = [
+    // Self-closing filter tags: <filter root="/path"/>
+    /<filter\s+root="([^"]+)"\s*\/>/g,
+    // Opening and closing filter tags: <filter root="/path"></filter>
     /<filter\s+root="([^"]+)"><\/filter>/g,
-    (match, originalPath) => {
+    // Opening and closing filter tags with content: <filter root="/path">...</filter>
+    /<filter\s+root="([^"]+)"[^>]*>.*?<\/filter>/g,
+  ];
+
+  for (const pattern of patterns) {
+    modifiedContent = modifiedContent.replace(pattern, (match, originalPath) => {
+      let newPath = originalPath;
+      let shouldReplace = false;
+
       if (originalPath === '/content/sta-xwalk-boilerplate/tools') {
-        const newPath = `/content/${repoName}/tools`;
-        core.info(`Converting path: ${originalPath} -> ${newPath}`);
-        return `<filter root="${newPath}"></filter>`;
+        newPath = `/content/${repoName}/tools`;
+        shouldReplace = true;
+      } else if (originalPath === '/content/sta-xwalk-boilerplate/block-collection') {
+        newPath = `/content/${repoName}/block-collection`;
+        shouldReplace = true;
+      } else if (originalPath === '/content/dam/sta-xwalk-boilerplate/block-collection') {
+        newPath = `/content/dam/${repoName}/block-collection`;
+        shouldReplace = true;
       }
-      if (originalPath === '/content/sta-xwalk-boilerplate/block-collection') {
-        const newPath = `/content/${repoName}/block-collection`;
+
+      if (shouldReplace) {
         core.info(`Converting path: ${originalPath} -> ${newPath}`);
-        return `<filter root="${newPath}"></filter>`;
+        // Determine the format to return based on the original match
+        if (match.includes('/>')) {
+          return `<filter root="${newPath}"/>`;
+        } else if (match.includes('></filter>')) {
+          return `<filter root="${newPath}"></filter>`;
+        } else {
+          // For more complex formats, preserve the structure but replace the root attribute
+          return match.replace(originalPath, newPath);
+        }
       }
-      if (originalPath === '/content/dam/sta-xwalk-boilerplate/block-collection') {
-        const newPath = `/content/dam/${repoName}/block-collection`;
-        core.info(`Converting path: ${originalPath} -> ${newPath}`);
-        return `<filter root="${newPath}"></filter>`;
-      }
+      
       return match; // Keep original if not a boilerplate path
-    },
-  );
+    });
+  }
+
+  return modifiedContent;
 }
 
 /**
@@ -119,6 +144,27 @@ function renameFoldersInJcrRoot(jcrRootPath, repoName) {
  * @param {string} outputPath - Path for the new zip file
  * @returns {Promise<void>}
  */
+/**
+ * Copy a directory recursively
+ * @param {string} src - Source directory
+ * @param {string} dest - Destination directory
+ */
+async function copyDirectory(src, dest) {
+  await fs.promises.mkdir(dest, { recursive: true });
+  const entries = await fs.promises.readdir(src, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDirectory(srcPath, destPath);
+    } else {
+      await fs.promises.copyFile(srcPath, destPath);
+    }
+  }
+}
+
 async function createZipFromDirectory(sourceDir, outputPath) {
   core.info(`Creating zip file: ${outputPath} from directory: ${sourceDir}`);
 
@@ -198,12 +244,41 @@ async function createPackageFromExtractedContent(zipContentsPath, repoName) {
   // Rename folders in jcr_root
   renameFoldersInJcrRoot(jcrRootPath, repoName);
 
-  // Create new zip with modified content
+  // Create new zip with modified content - only include jcr_root and META-INF
   const convertedPackagePath = path.join(zipContentsPath, `converted-boilerplate-${repoName}.zip`);
-  await createZipFromDirectory(zipContentsPath, convertedPackagePath);
-
-  core.info(`✅ Created converted boilerplate package: ${convertedPackagePath}`);
-  return convertedPackagePath;
+  
+  // Create a temporary directory with only the content we want to zip
+  const tempPackageDir = path.join(zipContentsPath, `temp-converted-${Date.now()}`);
+  fs.mkdirSync(tempPackageDir, { recursive: true });
+  
+  try {
+    // Copy jcr_root and META-INF to temp directory
+    const tempJcrRoot = path.join(tempPackageDir, 'jcr_root');
+    const tempMetaInf = path.join(tempPackageDir, 'META-INF');
+    
+    // Copy directories recursively
+    await copyDirectory(jcrRootPath, tempJcrRoot);
+    await copyDirectory(metaInfPath, tempMetaInf);
+    
+    // Create zip from the temp directory
+    await createZipFromDirectory(tempPackageDir, convertedPackagePath);
+    
+    core.info(`✅ Created converted boilerplate package: ${convertedPackagePath}`);
+    
+    // Verify the filter.xml in the created package
+    const verifyFilterPath = path.join(tempMetaInf, 'vault', 'filter.xml');
+    if (fs.existsSync(verifyFilterPath)) {
+      const verifyContent = fs.readFileSync(verifyFilterPath, 'utf8');
+      core.info(`🔍 Verification - Final filter.xml content:\n${verifyContent}`);
+    }
+    
+    return convertedPackagePath;
+  } finally {
+    // Clean up temp directory
+    if (fs.existsSync(tempPackageDir)) {
+      fs.rmSync(tempPackageDir, { recursive: true, force: true });
+    }
+  }
 }
 
 /**

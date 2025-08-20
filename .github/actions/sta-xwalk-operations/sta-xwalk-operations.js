@@ -16,46 +16,6 @@ import fs from 'fs';
 import path from 'path';
 import { doExtractContentPaths } from './xwalk-content.js';
 
-/**
- * Expected boilerplate paths that indicate this is a boilerplate package
- */
-const BOILERPLATE_PATHS = [
-  '/content/sta-xwalk-boilerplate/tools',
-  '/content/sta-xwalk-boilerplate/block-collection',
-  '/content/dam/sta-xwalk-boilerplate/block-collection',
-];
-
-/**
- * Check if the given paths match the boilerplate pattern
- * @param {string[]} paths - Array of paths from filter.xml
- * @returns {boolean} - True if this is a boilerplate package
- */
-function isBoilerplatePackage(paths) {
-  if (paths.length !== 3) {
-    return false;
-  }
-
-  // Sort both arrays to ensure order doesn't matter
-  const sortedPaths = [...paths].sort();
-  const sortedBoilerplate = [...BOILERPLATE_PATHS].sort();
-
-  return sortedPaths.every((pathItem, index) => pathItem === sortedBoilerplate[index]);
-}
-
-/**
- * Check if a package is a boilerplate from page paths input
- * @param {string} pagePathsInput - Comma-separated page paths from previous step
- * @returns {boolean} - True if this is a boilerplate package
- */
-function isBoilerplateFromPagePaths(pagePathsInput) {
-  if (!pagePathsInput) {
-    return false;
-  }
-
-  const paths = pagePathsInput.split(',').map((p) => p.trim());
-  return isBoilerplatePackage(paths);
-}
-
 export const XWALK_OPERATIONS = Object.freeze({
   UPLOAD: 'upload',
   GET_PAGE_PATHS: 'get-page-paths',
@@ -96,15 +56,10 @@ async function doUpload(
       'aem',
       'upload',
       '--zip', xwalkZipPath,
+      '--asset-mapping', assetMappingPath,
       '--target', target,
       '--token', accessToken,
     ];
-
-    // Only include asset-mapping if not skipping assets
-    if (!skipAssets && assetMappingPath) {
-      args.push('--asset-mapping', assetMappingPath);
-    }
-
     if (skipAssets) {
       args.push('--skip-assets');
     }
@@ -183,65 +138,25 @@ export async function run() {
       const hostTarget = `${url.origin}/`;
       const assetMappingPath = `${zipContentsPath}/asset-mapping.json`;
 
-      // Check if this is a boilerplate package
-      const pagePathsInput = core.getInput('page_paths');
-      const isBoilerplate = isBoilerplateFromPagePaths(pagePathsInput);
-
-      let finalAssetMappingPath = assetMappingPath;
-
-      if (isBoilerplate) {
-        core.info('Detected boilerplate package - skipping asset mapping entirely for upload');
-        finalAssetMappingPath = null; // Don't pass asset mapping for boilerplate packages
-      } else {
-        // Ensure asset-mapping.json exists for non-boilerplate packages
-        const fileExists = fs.existsSync(assetMappingPath);
-        const isFile = fileExists && fs.statSync(assetMappingPath).isFile();
-        const assetMappingMissing = !isFile;
-
-        if (assetMappingMissing) {
-          const message = `Asset mapping file not found at ${assetMappingPath}. Creating minimal asset-mapping.json for upload compatibility.`;
-          core.info(message);
-          const minimalAssetMapping = {
-            total: 0,
-            data: [],
-          };
-          fs.writeFileSync(assetMappingPath, JSON.stringify(minimalAssetMapping, null, 2));
-          core.info(`Created minimal asset-mapping.json at ${assetMappingPath}`);
-        }
-      }
-
-      const assetMappingInfo = finalAssetMappingPath ? `and "${finalAssetMappingPath}" ` : '';
-      core.info(`✅ Uploading "${contentPackagePath}" ${assetMappingInfo}to ${hostTarget}. Assets will ${skipAssets ? 'not ' : ''}be uploaded.`);
+      core.info(`✅ Uploading "${contentPackagePath}" and "${assetMappingPath}" to ${hostTarget}. Assets will ${skipAssets ? 'not ' : ''}be uploaded.`);
 
       await doUpload(
         contentPackagePath,
-        finalAssetMappingPath,
+        assetMappingPath,
         hostTarget,
         accessToken,
         skipAssets,
       );
       core.info('✅ Upload completed successfully.');
     } else if (operation === XWALK_OPERATIONS.GET_PAGE_PATHS) {
-      // First extract content paths to check if this is a boilerplate package
-      const extractedPaths = await doExtractContentPaths(zipContentsPath);
-      const isBoilerplate = isBoilerplatePackage(extractedPaths);
-
-      if (isBoilerplate) {
-        core.info('Detected boilerplate package - skipping asset mapping validation');
-      } else {
-        // Check for the asset mapping file for non-boilerplate packages
-        const assetMappingPath = path.join(zipContentsPath, 'asset-mapping.json');
-        if (!fs.existsSync(assetMappingPath) || !fs.statSync(assetMappingPath).isFile()) {
-          // Create a minimal asset-mapping.json file for packages that don't have one
-          core.info(`Asset mapping file not found at ${assetMappingPath}. Creating minimal asset-mapping.json for compatibility.`);
-          const minimalAssetMapping = {
-            total: 0,
-            data: [],
-          };
-          fs.writeFileSync(assetMappingPath, JSON.stringify(minimalAssetMapping, null, 2));
-          core.info(`Created minimal asset-mapping.json at ${assetMappingPath}`);
-        }
+      // Validate the existence of the asset mapping file
+      const assetMappingPath = path.join(zipContentsPath, 'asset-mapping.json');
+      if (!fs.existsSync(assetMappingPath)
+        || !fs.statSync(assetMappingPath).isFile()) {
+        throw new Error(`Asset mapping file not found at Import zip content path: ${assetMappingPath}`);
       }
+
+      await doExtractContentPaths(zipContentsPath);
     }
   } catch (error) {
     core.warning(`Error: XWalk operation ${operation} failed: ${error.message}`);

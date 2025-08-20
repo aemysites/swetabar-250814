@@ -16,46 +16,10 @@ import fs from 'fs';
 import path from 'path';
 import { doExtractContentPaths } from './xwalk-content.js';
 
-/**
- * Expected boilerplate paths that indicate this is a boilerplate package
- */
-const BOILERPLATE_PATHS = [
-  '/content/sta-xwalk-boilerplate/tools',
-  '/content/sta-xwalk-boilerplate/block-collection',
-  '/content/dam/sta-xwalk-boilerplate/block-collection',
-];
-
 export const XWALK_OPERATIONS = Object.freeze({
   UPLOAD: 'upload',
   GET_PAGE_PATHS: 'get-page-paths',
 });
-
-/**
- * Check if the given paths match the boilerplate pattern
- * @param {string[]} paths - Array of paths from filter.xml
- * @returns {boolean} - True if this is a boilerplate package
- */
-function isBoilerplatePackage(paths) {
-  if (!paths || paths.length === 0) {
-    return false;
-  }
-
-  // Check if all required boilerplate paths are present
-  const requiredPathsFound = BOILERPLATE_PATHS.every(requiredPath => 
-    paths.some(path => path === requiredPath)
-  );
-
-  // Also check if most paths are boilerplate-related (allows for additional paths)
-  const boilerplateRelatedPaths = paths.filter(path => 
-    path.includes('sta-xwalk-boilerplate')
-  );
-
-  // Consider it boilerplate if:
-  // 1. All required boilerplate paths are found, OR
-  // 2. At least 2 boilerplate-related paths are found and they make up most of the paths
-  return requiredPathsFound || 
-         (boilerplateRelatedPaths.length >= 2 && boilerplateRelatedPaths.length >= paths.length * 0.6);
-}
 
 /**
  * Get and validate the required input for the action.
@@ -185,26 +149,14 @@ export async function run() {
       );
       core.info('✅ Upload completed successfully.');
     } else if (operation === XWALK_OPERATIONS.GET_PAGE_PATHS) {
-      // First extract content paths to check if this is a boilerplate package
-      const extractedPaths = await doExtractContentPaths(zipContentsPath);
-      const isBoilerplate = isBoilerplatePackage(extractedPaths);
-
-      if (isBoilerplate) {
-        core.info('Detected boilerplate package - skipping asset mapping validation');
-      } else {
-        // Check for the asset mapping file for non-boilerplate packages
-        const assetMappingPath = path.join(zipContentsPath, 'asset-mapping.json');
-        if (!fs.existsSync(assetMappingPath) || !fs.statSync(assetMappingPath).isFile()) {
-          // Create a minimal asset-mapping.json file for packages that don't have one
-          core.info(`Asset mapping file not found at ${assetMappingPath}. Creating minimal asset-mapping.json for compatibility.`);
-          const minimalAssetMapping = {
-            total: 0,
-            data: [],
-          };
-          fs.writeFileSync(assetMappingPath, JSON.stringify(minimalAssetMapping, null, 2));
-          core.info(`Created minimal asset-mapping.json at ${assetMappingPath}`);
-        }
+      // Validate the existence of the asset mapping file
+      const assetMappingPath = path.join(zipContentsPath, 'asset-mapping.json');
+      if (!fs.existsSync(assetMappingPath)
+        || !fs.statSync(assetMappingPath).isFile()) {
+        throw new Error(`Asset mapping file not found at Import zip content path: ${assetMappingPath}`);
       }
+
+      await doExtractContentPaths(zipContentsPath);
     }
   } catch (error) {
     core.warning(`Error: XWalk operation ${operation} failed: ${error.message}`);

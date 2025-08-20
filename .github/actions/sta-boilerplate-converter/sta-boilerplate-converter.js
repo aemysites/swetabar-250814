@@ -391,9 +391,25 @@ export async function run() {
     // Use the optimized function that works with already extracted content
     const convertedPackagePath = await modifyExtractedContentPackage(zipContentsPath, repoName);
 
+    // Convert the page paths to repository-specific paths
+    const convertedPagePaths = pagePaths.map(originalPath => {
+      if (originalPath === '/content/sta-xwalk-boilerplate/tools') {
+        return `/content/${repoName}/tools`;
+      }
+      if (originalPath === '/content/sta-xwalk-boilerplate/block-collection') {
+        return `/content/${repoName}/block-collection`;
+      }
+      if (originalPath === '/content/dam/sta-xwalk-boilerplate/block-collection') {
+        return `/content/dam/${repoName}/block-collection`;
+      }
+      return originalPath; // Keep original if not a boilerplate path
+    });
+
     // Set outputs
     core.setOutput('converted_package_path', convertedPackagePath);
+    core.setOutput('converted_page_paths', convertedPagePaths.join(','));
     core.info(`Boilerplate conversion completed. Converted package: ${convertedPackagePath}`);
+    core.info(`Converted page paths: ${convertedPagePaths.join(', ')}`);
     core.info('Assets will be skipped during upload for boilerplate packages');
   } catch (error) {
     core.error(`Boilerplate conversion failed: ${error.message}`);

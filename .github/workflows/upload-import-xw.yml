@@ -280,7 +280,7 @@ jobs:
         with:
           access_token: ${{ steps.get-access-token-for-aem.outputs.access_token }}
           aem_url: ${{ github.event.inputs.root_mountpoint }}
-          page_paths: ${{ steps.package-detection.outputs.page_paths || steps.aem-content-paths.outputs.page_paths }}
+          page_paths: ${{ steps.boilerplate-conversion.outputs.converted_page_paths || steps.package-detection.outputs.page_paths || steps.aem-content-paths.outputs.page_paths }}
           is_preview: 'true'
 
       - name: '[Check] Replicate content to AEM Preview'
@@ -308,7 +308,7 @@ jobs:
         with:
           access_token: ${{ steps.get-access-token-for-aem.outputs.access_token }}
           aem_url: ${{ github.event.inputs.root_mountpoint }}
-          page_paths: ${{ steps.package-detection.outputs.page_paths || steps.aem-content-paths.outputs.page_paths }}
+          page_paths: ${{ steps.boilerplate-conversion.outputs.converted_page_paths || steps.package-detection.outputs.page_paths || steps.aem-content-paths.outputs.page_paths }}
           is_preview: 'false'
 
       - name: '[Check] Replicate content to AEM Publish'

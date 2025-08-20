@@ -15,6 +15,8 @@ outputs:
     description: 'Whether the package is a boilerplate that was converted'
   converted_package_path:
     description: 'Path to the converted content package (if conversion was needed)'
+  converted_page_paths:
+    description: 'Comma-separated list of converted page paths (if conversion was needed)'
   error_message:
     description: 'Error message if the operation failed'
 runs:

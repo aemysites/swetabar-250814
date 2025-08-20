@@ -161,6 +161,52 @@ async function extractContentPackage(contentPackagePath, extractDir) {
 }
 
 /**
+ * Create a content package from already extracted boilerplate content
+ * @param {string} zipContentsPath - Path to the already extracted import zip contents
+ * @param {string} repoName - Repository name for path replacement
+ * @returns {Promise<string>} - Path to the created content package
+ */
+async function createPackageFromExtractedContent(zipContentsPath, repoName) {
+  core.info(`Creating package from extracted boilerplate content in: ${zipContentsPath}`);
+
+  // Check if this is already extracted content (has jcr_root and META-INF directories)
+  const jcrRootPath = path.join(zipContentsPath, 'jcr_root');
+  const metaInfPath = path.join(zipContentsPath, 'META-INF');
+  
+  if (!fs.existsSync(jcrRootPath) || !fs.existsSync(metaInfPath)) {
+    throw new Error('Expected jcr_root and META-INF directories not found in extracted content');
+  }
+
+  core.info('✅ Found jcr_root and META-INF directories - processing extracted boilerplate content');
+
+  // Read and modify filter.xml
+  const filterXmlPath = path.join(metaInfPath, 'vault', 'filter.xml');
+  if (!fs.existsSync(filterXmlPath)) {
+    throw new Error('filter.xml not found in META-INF/vault directory');
+  }
+
+  const originalFilterContent = fs.readFileSync(filterXmlPath, 'utf8');
+  core.info(`📄 Original filter.xml content:\n${originalFilterContent}`);
+  
+  const modifiedFilterContent = convertBoilerplatePaths(originalFilterContent, repoName);
+  core.info(`📄 Modified filter.xml content:\n${modifiedFilterContent}`);
+
+  // Write the modified filter.xml back
+  fs.writeFileSync(filterXmlPath, modifiedFilterContent, 'utf8');
+  core.info('✅ Updated filter.xml with repository-specific paths');
+
+  // Rename folders in jcr_root
+  renameFoldersInJcrRoot(jcrRootPath, repoName);
+
+  // Create new zip with modified content
+  const convertedPackagePath = path.join(zipContentsPath, `converted-boilerplate-${repoName}.zip`);
+  await createZipFromDirectory(zipContentsPath, convertedPackagePath);
+
+  core.info(`✅ Created converted boilerplate package: ${convertedPackagePath}`);
+  return convertedPackagePath;
+}
+
+/**
  * Work directly with already extracted content package
  * @param {string} zipContentsPath - Path to the already extracted import zip contents
  * @param {string} repoName - Repository name for path replacement
@@ -169,12 +215,19 @@ async function extractContentPackage(contentPackagePath, extractDir) {
 async function modifyExtractedContentPackage(zipContentsPath, repoName) {
   core.info(`Working with already extracted content in: ${zipContentsPath}`);
 
-  // Find the content package (.zip file) in the extracted contents
+  // Check if this is already extracted boilerplate content (no .zip file, but has jcr_root/META-INF)
   const files = fs.readdirSync(zipContentsPath);
   const contentPackageFile = files.find((file) => file.endsWith('.zip'));
+  const hasJcrRoot = fs.existsSync(path.join(zipContentsPath, 'jcr_root'));
+  const hasMetaInf = fs.existsSync(path.join(zipContentsPath, 'META-INF'));
+
+  if (!contentPackageFile && hasJcrRoot && hasMetaInf) {
+    core.info('🔄 Detected extracted boilerplate content - creating package from directories');
+    return await createPackageFromExtractedContent(zipContentsPath, repoName);
+  }
 
   if (!contentPackageFile) {
-    throw new Error('No content package (.zip) found in the extracted import zip');
+    throw new Error('No content package (.zip) found in the extracted import zip and no extracted content directories found');
   }
 
   const contentPackagePath = path.join(zipContentsPath, contentPackageFile);

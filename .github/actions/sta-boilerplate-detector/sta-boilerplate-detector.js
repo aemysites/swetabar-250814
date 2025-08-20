@@ -63,14 +63,14 @@ function isBoilerplatePackage(paths) {
 /**
  * Gets the path to the content package zip file from the specified directory.
  * @param zipContentsPath
- * @returns {string}
+ * @returns {string|null} - Returns null if no zip file found (for boilerplate content)
  */
 function getContentPackagePath(zipContentsPath) {
   // Find the first .zip file in the directory
   const files = fs.readdirSync(zipContentsPath);
   const firstZipFile = files.find((file) => file.endsWith('.zip'));
   if (!firstZipFile) {
-    throw new Error('No .zip files found in the specified directory.');
+    return null; // No zip file found - might be boilerplate content
   }
 
   // Return the first .zip file found - presumably the content package
@@ -84,40 +84,62 @@ function getContentPackagePath(zipContentsPath) {
  */
 async function detectBoilerplate(zipContentsPath) {
   const contentPackagePath = getContentPackagePath(zipContentsPath);
-  core.info(`✅ Content Package Path: ${contentPackagePath}`);
-
+  
+  // Check if this is boilerplate content (no zip file, but META-INF directory exists)
+  const metaInfPath = path.join(zipContentsPath, 'META-INF', 'vault', 'filter.xml');
+  const isBoilerplateContent = !contentPackagePath && fs.existsSync(metaInfPath);
+  
   let extractedPaths = [];
 
-  try {
-    await new Promise((resolve, reject) => {
-      fs.createReadStream(contentPackagePath)
-        .pipe(unzipper.ParseOne('META-INF/vault/filter.xml'))
-        .pipe(fs.createWriteStream('filter.xml'))
-        .on('finish', () => {
-          core.info('filter.xml extracted successfully');
-          fs.readFile('filter.xml', 'utf8', (err, data) => {
-            if (err) {
-              reject(new Error(`Error reading extracted file: ${err}`));
-            } else {
-              core.debug(`Filter XML content: ${data}`);
-              const paths = getFilterPaths(data);
-              extractedPaths = paths;
-              resolve();
-            }
-          });
-        })
-        .on('error', (error) => {
-          reject(new Error(`Error extracting filter.xml: ${error}`));
-        });
-    });
-  } finally {
-    // Clean up the filter xml file after extraction
+  if (isBoilerplateContent) {
+    core.info('✅ Detected boilerplate content - reading filter.xml directly');
+    
     try {
-      if (fs.existsSync('filter.xml')) {
-        fs.unlinkSync('filter.xml');
+      const filterContent = fs.readFileSync(metaInfPath, 'utf8');
+      core.debug(`Filter XML content: ${filterContent}`);
+      extractedPaths = getFilterPaths(filterContent);
+      core.info(`✅ Extracted ${extractedPaths.length} page paths from boilerplate content: ${extractedPaths.join(', ')}`);
+    } catch (error) {
+      throw new Error(`Error reading filter.xml from boilerplate content: ${error.message}`);
+    }
+  } else {
+    if (!contentPackagePath) {
+      throw new Error('No .zip files found in the specified directory and no boilerplate content detected.');
+    }
+    
+    core.info(`✅ Content Package Path: ${contentPackagePath}`);
+
+    try {
+      await new Promise((resolve, reject) => {
+        fs.createReadStream(contentPackagePath)
+          .pipe(unzipper.ParseOne('META-INF/vault/filter.xml'))
+          .pipe(fs.createWriteStream('filter.xml'))
+          .on('finish', () => {
+            core.info('filter.xml extracted successfully');
+            fs.readFile('filter.xml', 'utf8', (err, data) => {
+              if (err) {
+                reject(new Error(`Error reading extracted file: ${err}`));
+              } else {
+                core.debug(`Filter XML content: ${data}`);
+                const paths = getFilterPaths(data);
+                extractedPaths = paths;
+                resolve();
+              }
+            });
+          })
+          .on('error', (error) => {
+            reject(new Error(`Error extracting filter.xml: ${error}`));
+          });
+      });
+    } finally {
+      // Clean up the filter xml file after extraction
+      try {
+        if (fs.existsSync('filter.xml')) {
+          fs.unlinkSync('filter.xml');
+        }
+      } catch (cleanupError) {
+        core.warning(`Failed to remove filter.xml: ${cleanupError.message}`);
       }
-    } catch (cleanupError) {
-      core.warning(`Failed to remove filter.xml: ${cleanupError.message}`);
     }
   }
 
@@ -125,7 +147,7 @@ async function detectBoilerplate(zipContentsPath) {
 
   return {
     isBoilerplate,
-    contentPackagePath,
+    contentPackagePath: contentPackagePath || '', // Return empty string for boilerplate content
     pagePaths: extractedPaths,
   };
 }

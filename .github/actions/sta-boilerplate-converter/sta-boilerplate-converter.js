@@ -31,15 +31,25 @@ const BOILERPLATE_PATHS = [
  * @returns {boolean} - True if this is a boilerplate package
  */
 function isBoilerplatePackage(paths) {
-  if (paths.length !== 3) {
+  if (!paths || paths.length === 0) {
     return false;
   }
 
-  // Sort both arrays to ensure order doesn't matter
-  const sortedPaths = [...paths].sort();
-  const sortedBoilerplate = [...BOILERPLATE_PATHS].sort();
+  // Check if all required boilerplate paths are present
+  const requiredPathsFound = BOILERPLATE_PATHS.every(requiredPath => 
+    paths.some(path => path === requiredPath)
+  );
 
-  return sortedPaths.every((pathItem, index) => pathItem === sortedBoilerplate[index]);
+  // Also check if most paths are boilerplate-related (allows for additional paths)
+  const boilerplateRelatedPaths = paths.filter(path => 
+    path.includes('sta-xwalk-boilerplate')
+  );
+
+  // Consider it boilerplate if:
+  // 1. All required boilerplate paths are found, OR
+  // 2. At least 2 boilerplate-related paths are found and they make up most of the paths
+  return requiredPathsFound || 
+         (boilerplateRelatedPaths.length >= 2 && boilerplateRelatedPaths.length >= paths.length * 0.6);
 }
 
 /**

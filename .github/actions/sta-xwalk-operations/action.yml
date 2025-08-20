@@ -15,8 +15,11 @@ inputs:
   content_package_path:
     description: "The path to the AEM content package in for Upload."
   skip_assets:
-    description: "The agent name to help identify things in logs."
+    description: "Whether to skip asset upload."
     default: 'false'
+  page_paths:
+    description: "Comma-separated list of page paths for upload operation."
+    required: false
 outputs:
   error_message:
     description: "Error message if the operation could not be completed"

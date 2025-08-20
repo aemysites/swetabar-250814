@@ -30,13 +30,27 @@ const BOILERPLATE_PATHS = [
  * @returns {string[]}
  */
 function getFilterPaths(xmlString) {
-  const lines = xmlString.split('\n');
   const paths = [];
 
-  for (const line of lines) {
-    const match = line.match(/^\s*<filter\s+root="([^"]+)"><\/filter>\s*$/);
-    if (match) {
-      paths.push(match[1]);
+  // Try multiple regex patterns to handle different XML formats
+  const patterns = [
+    // Self-closing filter tags: <filter root="/path"/>
+    /<filter\s+root="([^"]+)"\s*\/>/g,
+    // Opening and closing filter tags: <filter root="/path"></filter>
+    /<filter\s+root="([^"]+)"><\/filter>/g,
+    // Opening and closing filter tags with content: <filter root="/path">...</filter>
+    /<filter\s+root="([^"]+)"[^>]*>.*?<\/filter>/g,
+    // Filter tags with other attributes
+    /<filter[^>]+root="([^"]+)"[^>]*>/g
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(xmlString)) !== null) {
+      const path = match[1];
+      if (path && !paths.includes(path)) {
+        paths.push(path);
+      }
     }
   }
 
@@ -49,15 +63,25 @@ function getFilterPaths(xmlString) {
  * @returns {boolean} - True if this is a boilerplate package
  */
 function isBoilerplatePackage(paths) {
-  if (paths.length !== 3) {
+  if (!paths || paths.length === 0) {
     return false;
   }
 
-  // Sort both arrays to ensure order doesn't matter
-  const sortedPaths = [...paths].sort();
-  const sortedBoilerplate = [...BOILERPLATE_PATHS].sort();
+  // Check if all required boilerplate paths are present
+  const requiredPathsFound = BOILERPLATE_PATHS.every(requiredPath => 
+    paths.some(path => path === requiredPath)
+  );
 
-  return sortedPaths.every((pathItem, index) => pathItem === sortedBoilerplate[index]);
+  // Also check if most paths are boilerplate-related (allows for additional paths)
+  const boilerplateRelatedPaths = paths.filter(path => 
+    path.includes('sta-xwalk-boilerplate')
+  );
+
+  // Consider it boilerplate if:
+  // 1. All required boilerplate paths are found, OR
+  // 2. At least 2 boilerplate-related paths are found and they make up most of the paths
+  return requiredPathsFound || 
+         (boilerplateRelatedPaths.length >= 2 && boilerplateRelatedPaths.length >= paths.length * 0.6);
 }
 
 /**

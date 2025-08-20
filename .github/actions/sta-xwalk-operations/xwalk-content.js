@@ -21,13 +21,27 @@ import unzipper from 'unzipper';
  * @returns {string[]}
  */
 function getFilterPaths(xmlString) {
-  const lines = xmlString.split('\n');
   const paths = [];
 
-  for (const line of lines) {
-    const match = line.match(/^\s*<filter\s+root="([^"]+)"><\/filter>\s*$/);
-    if (match) {
-      paths.push(match[1]);
+  // Try multiple regex patterns to handle different XML formats
+  const patterns = [
+    // Self-closing filter tags: <filter root="/path"/>
+    /<filter\s+root="([^"]+)"\s*\/>/g,
+    // Opening and closing filter tags: <filter root="/path"></filter>
+    /<filter\s+root="([^"]+)"><\/filter>/g,
+    // Opening and closing filter tags with content: <filter root="/path">...</filter>
+    /<filter\s+root="([^"]+)"[^>]*>.*?<\/filter>/g,
+    // Filter tags with other attributes
+    /<filter[^>]+root="([^"]+)"[^>]*>/g
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(xmlString)) !== null) {
+      const path = match[1];
+      if (path && !paths.includes(path)) {
+        paths.push(path);
+      }
     }
   }
 

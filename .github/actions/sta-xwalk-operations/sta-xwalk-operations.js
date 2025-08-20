@@ -16,10 +16,36 @@ import fs from 'fs';
 import path from 'path';
 import { doExtractContentPaths } from './xwalk-content.js';
 
+/**
+ * Expected boilerplate paths that indicate this is a boilerplate package
+ */
+const BOILERPLATE_PATHS = [
+  '/content/sta-xwalk-boilerplate/tools',
+  '/content/sta-xwalk-boilerplate/block-collection',
+  '/content/dam/sta-xwalk-boilerplate/block-collection',
+];
+
 export const XWALK_OPERATIONS = Object.freeze({
   UPLOAD: 'upload',
   GET_PAGE_PATHS: 'get-page-paths',
 });
+
+/**
+ * Check if the given paths match the boilerplate pattern
+ * @param {string[]} paths - Array of paths from filter.xml
+ * @returns {boolean} - True if this is a boilerplate package
+ */
+function isBoilerplatePackage(paths) {
+  if (paths.length !== 3) {
+    return false;
+  }
+
+  // Sort both arrays to ensure order doesn't matter
+  const sortedPaths = [...paths].sort();
+  const sortedBoilerplate = [...BOILERPLATE_PATHS].sort();
+
+  return sortedPaths.every((pathItem, index) => pathItem === sortedBoilerplate[index]);
+}
 
 /**
  * Get and validate the required input for the action.

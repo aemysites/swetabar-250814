@@ -52,6 +52,29 @@ function getContentPackagePath(zipContentsPath) {
 }
 
 export async function doExtractContentPaths(zipContentsPath) {
+  core.info(`🔍 Analyzing directory: ${zipContentsPath}`);
+  
+  // List directory contents for debugging
+  try {
+    const files = fs.readdirSync(zipContentsPath);
+    core.info(`📁 Directory contents: ${files.join(', ')}`);
+    
+    // Check for META-INF directory
+    const metaInfDir = path.join(zipContentsPath, 'META-INF');
+    if (fs.existsSync(metaInfDir)) {
+      const metaInfFiles = fs.readdirSync(metaInfDir);
+      core.info(`📁 META-INF contents: ${metaInfFiles.join(', ')}`);
+      
+      const vaultDir = path.join(metaInfDir, 'vault');
+      if (fs.existsSync(vaultDir)) {
+        const vaultFiles = fs.readdirSync(vaultDir);
+        core.info(`📁 META-INF/vault contents: ${vaultFiles.join(', ')}`);
+      }
+    }
+  } catch (error) {
+    core.warning(`Could not list directory contents: ${error.message}`);
+  }
+  
   const contentPackagePath = getContentPackagePath(zipContentsPath);
   
   // Check if this is boilerplate content (no zip file, but META-INF directory exists)
@@ -60,16 +83,25 @@ export async function doExtractContentPaths(zipContentsPath) {
   
   if (isBoilerplateContent) {
     core.info('✅ Detected boilerplate content - reading filter.xml directly');
+    core.info(`📁 Reading filter.xml from: ${metaInfPath}`);
     core.setOutput('content_package_path', ''); // No zip file for boilerplate
     
     try {
       const filterContent = fs.readFileSync(metaInfPath, 'utf8');
-      core.debug(`Filter XML content: ${filterContent}`);
+      core.info(`📄 Filter XML content (${filterContent.length} characters):`);
+      core.info(`${filterContent}`);
       const paths = getFilterPaths(filterContent);
+      core.info(`🔍 Parsed paths: [${paths.map(p => `"${p}"`).join(', ')}]`);
       core.setOutput('page_paths', paths);
       core.info(`✅ Extracted ${paths.length} page paths from boilerplate content: ${paths.join(', ')}`);
       return paths;
     } catch (error) {
+      core.error(`❌ Error reading filter.xml from boilerplate content: ${error.message}`);
+      core.info(`📁 Checking if file exists: ${fs.existsSync(metaInfPath)}`);
+      if (fs.existsSync(metaInfPath)) {
+        const stats = fs.statSync(metaInfPath);
+        core.info(`📊 File stats - Size: ${stats.size} bytes, Modified: ${stats.mtime}`);
+      }
       throw new Error(`Error reading filter.xml from boilerplate content: ${error.message}`);
     }
   }

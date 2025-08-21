@@ -231,7 +231,7 @@ async function createPackageFromExtractedContent(zipContentsPath, repoName) {
   core.info('✅ Updated filter.xml with repository-specific paths');
 
   // Rename folders in jcr_root
-  renameFoldersInJcrRoot(jcrRootPath, repoName);
+  // renameFoldersInJcrRoot(jcrRootPath, repoName);
 
   // Create new zip with modified content - only include jcr_root and META-INF
   const convertedPackagePath = path.join(zipContentsPath, `converted-boilerplate-${repoName}.zip`);

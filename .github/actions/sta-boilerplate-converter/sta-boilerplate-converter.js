@@ -75,22 +75,11 @@ function convertBoilerplatePaths(filterXmlContent, repoName) {
 
   for (const pattern of patterns) {
     modifiedContent = modifiedContent.replace(pattern, (match, originalPath) => {
-      let newPath = originalPath;
-      let shouldReplace = false;
-
-      if (originalPath === '/content/sta-xwalk-boilerplate/tools') {
-        newPath = `/content/${repoName}/tools`;
-        shouldReplace = true;
-      } else if (originalPath === '/content/sta-xwalk-boilerplate/block-collection') {
-        newPath = `/content/${repoName}/block-collection`;
-        shouldReplace = true;
-      } else if (originalPath === '/content/dam/sta-xwalk-boilerplate/block-collection') {
-        newPath = `/content/dam/${repoName}/block-collection`;
-        shouldReplace = true;
-      }
-
-      if (shouldReplace) {
+      // Convert ALL paths that contain 'sta-xwalk-boilerplate' to use the repo name
+      if (originalPath.includes('sta-xwalk-boilerplate')) {
+        const newPath = originalPath.replace(/sta-xwalk-boilerplate/g, repoName);
         core.info(`Converting path: ${originalPath} -> ${newPath}`);
+        
         // Determine the format to return based on the original match
         if (match.includes('/>')) {
           return `<filter root="${newPath}"/>`;
@@ -393,14 +382,9 @@ export async function run() {
 
     // Convert the page paths to repository-specific paths
     const convertedPagePaths = pagePaths.map(originalPath => {
-      if (originalPath === '/content/sta-xwalk-boilerplate/tools') {
-        return `/content/${repoName}/tools`;
-      }
-      if (originalPath === '/content/sta-xwalk-boilerplate/block-collection') {
-        return `/content/${repoName}/block-collection`;
-      }
-      if (originalPath === '/content/dam/sta-xwalk-boilerplate/block-collection') {
-        return `/content/dam/${repoName}/block-collection`;
+      // Convert ALL paths that contain 'sta-xwalk-boilerplate' to use the repo name
+      if (originalPath.includes('sta-xwalk-boilerplate')) {
+        return originalPath.replace(/sta-xwalk-boilerplate/g, repoName);
       }
       return originalPath; // Keep original if not a boilerplate path
     });

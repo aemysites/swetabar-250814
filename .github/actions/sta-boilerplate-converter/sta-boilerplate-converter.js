@@ -76,11 +76,11 @@ function convertBoilerplatePaths(filterXmlContent, repoName) {
   for (const pattern of patterns) {
     modifiedContent = modifiedContent.replace(pattern, (match, originalPath) => {
       // Convert ALL paths that contain 'sta-xwalk-boilerplate' to use the repo name
-      if (originalPath.includes('sta-xwalk-boilerplate')) {
-        const newPath = originalPath.replace(/sta-xwalk-boilerplate/g, repoName);
-        core.info(`Converting path: ${originalPath} -> ${sta-xwalk-boilerplate}`);
-        
-        // Determine the format to return based on the original match
+              if (originalPath.includes('sta-xwalk-boilerplate')) {
+          const newPath = originalPath.replace(/sta-xwalk-boilerplate/g, repoName);
+          core.info(`Converting path: ${originalPath} -> ${newPath}`);
+          
+          // Determine the format to return based on the original match
         if (match.includes('/>')) {
           return `<filter root="${newPath}"/>`;
         } else if (match.includes('></filter>')) {

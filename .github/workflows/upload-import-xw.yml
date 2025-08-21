@@ -176,34 +176,34 @@ jobs:
           status_type: error
           agent_name: upload-import-xw
 
-      - name: '[Progress] Convert boilerplate content'
-        if: ${{ steps.package-detection.outputs.is_boilerplate == 'true' }}
-        uses: ./.github/actions/sta-status
-        with:
-          callback_urls: ${{ github.event.inputs.aemy_callback_urls }}
-          context: ${{ github.event.inputs.aemy_context }}
-          message: Boilerplate package detected. Converting paths and folders... (Step 3 of ${{ env.total_steps }}). ${{ env.ACTION_URL }}
-          status_type: progress
-          agent_name: upload-import-xw
+      # - name: '[Progress] Convert boilerplate content'
+      #   if: ${{ steps.package-detection.outputs.is_boilerplate == 'true' }}
+      #   uses: ./.github/actions/sta-status
+      #   with:
+      #     callback_urls: ${{ github.event.inputs.aemy_callback_urls }}
+      #     context: ${{ github.event.inputs.aemy_context }}
+      #     message: Boilerplate package detected. Converting paths and folders... (Step 3 of ${{ env.total_steps }}). ${{ env.ACTION_URL }}
+      #     status_type: progress
+      #     agent_name: upload-import-xw
 
-      - name: Convert boilerplate content
-        if: ${{ steps.package-detection.outputs.is_boilerplate == 'true' }}
-        id: boilerplate-conversion
-        uses: ./.github/actions/sta-boilerplate-converter
-        with:
-          zip_contents_path: ${{ steps.download-zip.outputs.zip_contents_path }}
-          page_paths: ${{ steps.package-detection.outputs.page_paths }}
-          repo_name: ${{ github.event.repository.name }}
+      # - name: Convert boilerplate content
+      #   if: ${{ steps.package-detection.outputs.is_boilerplate == 'true' }}
+      #   id: boilerplate-conversion
+      #   uses: ./.github/actions/sta-boilerplate-converter
+      #   with:
+      #     zip_contents_path: ${{ steps.download-zip.outputs.zip_contents_path }}
+      #     page_paths: ${{ steps.package-detection.outputs.page_paths }}
+      #     repo_name: ${{ github.event.repository.name }}
 
-      - name: '[Check] Boilerplate conversion'
-        if: ${{ steps.package-detection.outputs.is_boilerplate == 'true' && steps.boilerplate-conversion.outputs.error_message != '' }}
-        uses: ./.github/actions/sta-status
-        with:
-          callback_urls: ${{ github.event.inputs.aemy_callback_urls }}
-          context: ${{ github.event.inputs.aemy_context }}
-          message: ${{ steps.boilerplate-conversion.outputs.error_message }} ${{ env.ACTION_URL }}
-          status_type: error
-          agent_name: upload-import-xw
+      # - name: '[Check] Boilerplate conversion'
+      #   if: ${{ steps.package-detection.outputs.is_boilerplate == 'true' && steps.boilerplate-conversion.outputs.error_message != '' }}
+      #   uses: ./.github/actions/sta-status
+      #   with:
+      #     callback_urls: ${{ github.event.inputs.aemy_callback_urls }}
+      #     context: ${{ github.event.inputs.aemy_context }}
+      #     message: ${{ steps.boilerplate-conversion.outputs.error_message }} ${{ env.ACTION_URL }}
+      #     status_type: error
+      #     agent_name: upload-import-xw
 
       - name: '[Progress] Get access token for AEM'
         uses: ./.github/actions/sta-status

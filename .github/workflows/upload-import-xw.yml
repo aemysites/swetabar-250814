@@ -83,8 +83,7 @@ jobs:
           npm install
           cd ../sta-aem-publish
           npm install
-          cd ../xwalk
-          npm install
+
 
       - name: '[Check] Validate inputs'
         if: ${{ env.errorMessage != '' }}
@@ -132,10 +131,10 @@ jobs:
 
       - name: Detect and convert package
         id: package-detection
-        uses: ./.github/actions/xwalk
+        uses: ./.github/actions/sta-xwalk-operations
         with:
+          operation: convert-boilerplate
           zip_contents_path: ${{ steps.download-zip.outputs.zip_contents_path }}
-          convert: 'true'
           repo_name: ${{ github.event.repository.name }}
 
       - name: '[Check] Package type detection'

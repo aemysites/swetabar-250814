@@ -489,11 +489,20 @@ async function modifyExtractedContentPackage(zipContentsPath, repoName) {
  * | UPLOAD          | aem_author_url       | Target Adobe AEM Cloud URL.           | No       |
  * | UPLOAD          | content_package_path | Path to AEM package in zip contents.  | No       |
  * | UPLOAD          | skip_assets          | Agent name for log identification.    | No       |
+ * | CONVERT_BOILERPLATE | repo_name        | Repository name for path replacement. | Yes      |
  * |-----------------|----------------------|---------------------------------------|----------|
- * | OUTPUTS                                                                             |
+ * | OUTPUTS                                                                                   |
  * | *               | error_message        | Error if operation could not complete.| Output   |
  * | GET_PAGE_PATHS  | content_package_path | Path to content package zip file.     | Output   |
  * | GET_PAGE_PATHS  | page_paths           | Comma-delimited list of page paths.   | Output   |
+ * | DETECT_BOILERPLATE | is_boilerplate    | Whether package is boilerplate.       | Output   |
+ * | DETECT_BOILERPLATE | content_package_path | Path to content package zip file.  | Output   |
+ * | DETECT_BOILERPLATE | page_paths        | Comma-delimited list of page paths.   | Output   |
+ * | CONVERT_BOILERPLATE | is_boilerplate   | Whether package is boilerplate.       | Output   |
+ * | CONVERT_BOILERPLATE | content_package_path | Path to content package zip file. | Output   |
+ * | CONVERT_BOILERPLATE | page_paths       | Comma-delimited list of page paths.   | Output   |
+ * | CONVERT_BOILERPLATE | converted_package_path | Path to converted package.      | Output   |
+ * | CONVERT_BOILERPLATE | converted_page_paths | JSON string of converted paths.   | Output   |
  *
  * @returns {Promise<void>}
  */

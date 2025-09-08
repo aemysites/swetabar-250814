@@ -13,6 +13,7 @@
 import core from '@actions/core';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
+import { getAccessTokenWithFallback } from './ims-token-helper.js';
 import { AEM_HELPER_OPERATIONS } from './sta-aem-helper-constants.js';
 import { doPreviewPublish, deletePreviewPublish } from './aem-preview-publish.js';
 
@@ -219,12 +220,14 @@ async function run() {
       const pagesInput = core.getInput('pages');
       const context = core.getInput('context');
       const pages = JSON.parse(pagesInput);
-      const token = process.env.IMS_TOKEN;
+
+      // Get access token with fallback logic
+      const accessToken = await getAccessTokenWithFallback();
 
       if (operation === AEM_HELPER_OPERATIONS.DELETE_PREVIEW_AND_PUBLISH) {
-        await deletePreviewPublish(pages, context, token);
+        await deletePreviewPublish(pages, context, accessToken);
       } else {
-        await doPreviewPublish(pages, operation, context, token);
+        await doPreviewPublish(pages, operation, context, accessToken);
       }
     } else {
       throw new Error(`Unknown AEM helper operation: ${operation}`);

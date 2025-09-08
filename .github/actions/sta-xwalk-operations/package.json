@@ -14,7 +14,6 @@
   "description": "Operations specific to XWalk",
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "unzipper": "^0.12.3",
-    "archiver": "^7.0.1"
+    "unzipper": "^0.12.3"
   }
 }

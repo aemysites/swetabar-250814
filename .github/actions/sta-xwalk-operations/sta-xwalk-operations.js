@@ -15,13 +15,13 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import unzipper from 'unzipper';
+// eslint-disable-next-line import/no-unresolved, import/no-extraneous-dependencies
 import archiver from 'archiver';
 import { doExtractContentPaths } from './xwalk-content.js';
 
 export const XWALK_OPERATIONS = Object.freeze({
   UPLOAD: 'upload',
   GET_PAGE_PATHS: 'get-page-paths',
-  DETECT_BOILERPLATE: 'detect-boilerplate',
   CONVERT_BOILERPLATE: 'convert-boilerplate',
 });
 
@@ -121,15 +121,16 @@ function getFilterPaths(xmlString) {
     // Opening and closing filter tags with content: <filter root="/path">...</filter>
     /<filter\s+root="([^"]+)"[^>]*>.*?<\/filter>/g,
     // Filter tags with other attributes
-    /<filter[^>]+root="([^"]+)"[^>]*>/g
+    /<filter[^>]+root="([^"]+)"[^>]*>/g,
   ];
 
   for (const pattern of patterns) {
     let match;
+    // eslint-disable-next-line no-cond-assign
     while ((match = pattern.exec(xmlString)) !== null) {
-      const path = match[1];
-      if (path && !paths.includes(path)) {
-        paths.push(path);
+      const filterPath = match[1];
+      if (filterPath && !paths.includes(filterPath)) {
+        paths.push(filterPath);
       }
     }
   }
@@ -138,30 +139,20 @@ function getFilterPaths(xmlString) {
 }
 
 /**
- * Check if the given paths match the boilerplate pattern
+ * Check if all the given paths start with any of the BOILERPLATE_PATHS
  * @param {string[]} paths - Array of paths from filter.xml
- * @returns {boolean} - True if this is a boilerplate package
+ * @returns {boolean} - True if all paths start with any boilerplate path
  */
 function isBoilerplatePackage(paths) {
   if (!paths || paths.length === 0) {
     return false;
   }
 
-  // Check if all required boilerplate paths are present
-  const requiredPathsFound = BOILERPLATE_PATHS.every(requiredPath => 
-    paths.some(path => path === requiredPath)
-  );
-
-  // Also check if most paths are boilerplate-related (allows for additional paths)
-  const boilerplateRelatedPaths = paths.filter(path => 
-    path.includes('sta-xwalk-boilerplate')
-  );
-
-  // Consider it boilerplate if:
-  // 1. All required boilerplate paths are found, OR
-  // 2. At least 2 boilerplate-related paths are found and they make up most of the paths
-  return requiredPathsFound || 
-         (boilerplateRelatedPaths.length >= 2 && boilerplateRelatedPaths.length >= paths.length * 0.6);
+  // Check if all paths start with any of the boilerplate paths
+  function startsWithBoilerplate(pathItem) {
+    return BOILERPLATE_PATHS.some((boilerplatePath) => pathItem.startsWith(boilerplatePath));
+  }
+  return paths.every(startsWithBoilerplate);
 }
 
 /**
@@ -188,16 +179,16 @@ function getContentPackagePath(zipContentsPath) {
  */
 async function detectBoilerplate(zipContentsPath) {
   const contentPackagePath = getContentPackagePath(zipContentsPath);
-  
+
   // Check if this is boilerplate content (no zip file, but META-INF directory exists)
   const metaInfPath = path.join(zipContentsPath, 'META-INF', 'vault', 'filter.xml');
   const isBoilerplateContent = !contentPackagePath && fs.existsSync(metaInfPath);
-  
+
   let extractedPaths = [];
 
   if (isBoilerplateContent) {
     core.info('✅ Detected boilerplate content - reading filter.xml directly');
-    
+
     try {
       const filterContent = fs.readFileSync(metaInfPath, 'utf8');
       core.debug(`Filter XML content: ${filterContent}`);
@@ -210,7 +201,7 @@ async function detectBoilerplate(zipContentsPath) {
     if (!contentPackagePath) {
       throw new Error('No .zip files found in the specified directory and no boilerplate content detected.');
     }
-    
+
     core.info(`✅ Content Package Path: ${contentPackagePath}`);
 
     try {
@@ -264,13 +255,13 @@ async function detectBoilerplate(zipContentsPath) {
  */
 function convertBoilerplatePaths(filterXmlContent, repoName) {
   core.info(`Converting boilerplate paths for repository: ${repoName}`);
-  
+
   // Use regex to find and replace paths, preserving XML structure
   let modifiedContent = filterXmlContent;
-  
+
   // Replace the paths in root attributes and any text content
   modifiedContent = modifiedContent.replace(/sta-xwalk-boilerplate/g, repoName);
-  
+
   // Also handle the case where paths might be in different formats or escaped
   // This regex looks for paths that contain 'sta-xwalk-boilerplate' and replaces them
   modifiedContent = modifiedContent.replace(
@@ -283,13 +274,13 @@ function convertBoilerplatePaths(filterXmlContent, repoName) {
         return `root="${newPath}"`;
       }
       return match; // Keep original if something went wrong
-    }
+    },
   );
 
   // Additional pattern to catch any remaining instances that might be formatted differently
   modifiedContent = modifiedContent.replace(
     /([^"\w-])sta-xwalk-boilerplate([^"\w-])/g,
-    `$1${repoName}$2`
+    `$1${repoName}$2`,
   );
 
   return modifiedContent;
@@ -334,7 +325,7 @@ async function createZipFromDirectory(sourceDir, outputPath) {
   return new Promise((resolve, reject) => {
     const output = fs.createWriteStream(outputPath);
     const archive = archiver('zip', {
-      zlib: { level: 9 } // Sets the compression level.
+      zlib: { level: 9 }, // Sets the compression level.
     });
 
     output.on('close', () => {
@@ -347,10 +338,10 @@ async function createZipFromDirectory(sourceDir, outputPath) {
     });
 
     archive.pipe(output);
-    
+
     // Add all contents of the source directory to the zip
     archive.directory(sourceDir, false);
-    
+
     archive.finalize();
   });
 }
@@ -382,7 +373,7 @@ async function createPackageFromExtractedContent(zipContentsPath, repoName) {
   // Check if this is already extracted content (has jcr_root and META-INF directories)
   const jcrRootPath = path.join(zipContentsPath, 'jcr_root');
   const metaInfPath = path.join(zipContentsPath, 'META-INF');
-  
+
   if (!fs.existsSync(jcrRootPath) || !fs.existsSync(metaInfPath)) {
     throw new Error('Expected jcr_root and META-INF directories not found in extracted content');
   }
@@ -397,7 +388,7 @@ async function createPackageFromExtractedContent(zipContentsPath, repoName) {
 
   const originalFilterContent = fs.readFileSync(filterXmlPath, 'utf8');
   core.info(`📄 Original filter.xml content:\n${originalFilterContent}`);
-  
+
   const modifiedFilterContent = convertBoilerplatePaths(originalFilterContent, repoName);
   core.info(`📄 Modified filter.xml content:\n${modifiedFilterContent}`);
 
@@ -410,7 +401,7 @@ async function createPackageFromExtractedContent(zipContentsPath, repoName) {
 
   // Create new zip with modified content - only include jcr_root and META-INF
   const convertedPackagePath = path.join(zipContentsPath, `converted-boilerplate-${repoName}.zip`);
-  
+
   // Create a temporary directory with only the content we want to zip
   const tempPackageDir = path.join(zipContentsPath, 'temp_package');
   if (fs.existsSync(tempPackageDir)) {
@@ -421,7 +412,7 @@ async function createPackageFromExtractedContent(zipContentsPath, repoName) {
   // Copy jcr_root and META-INF to temp directory
   const tempJcrRoot = path.join(tempPackageDir, 'jcr_root');
   const tempMetaInf = path.join(tempPackageDir, 'META-INF');
-  
+
   fs.cpSync(jcrRootPath, tempJcrRoot, { recursive: true });
   fs.cpSync(metaInfPath, tempMetaInf, { recursive: true });
 
@@ -440,7 +431,7 @@ async function createPackageFromExtractedContent(zipContentsPath, repoName) {
 }
 
 /**
- * Modify extracted content package (handles both zipped content packages and already extracted boilerplate content)
+ * Modify extracted content package (handles both zipped and extracted boilerplate content)
  * @param {string} zipContentsPath - Path to the extracted import zip contents
  * @param {string} repoName - Repository name for path replacement
  * @returns {Promise<string>} - Path to the converted content package
@@ -448,7 +439,7 @@ async function createPackageFromExtractedContent(zipContentsPath, repoName) {
 async function modifyExtractedContentPackage(zipContentsPath, repoName) {
   core.info(`Processing content package in: ${zipContentsPath}`);
 
-  // Check if this is already extracted boilerplate content (no .zip file, but has jcr_root/META-INF)
+  // Check if this is already extracted boilerplate content (no .zip file, but has directories)
   const jcrRootPath = path.join(zipContentsPath, 'jcr_root');
   const metaInfPath = path.join(zipContentsPath, 'META-INF');
   const hasDirectories = fs.existsSync(jcrRootPath) && fs.existsSync(metaInfPath);
@@ -456,10 +447,11 @@ async function modifyExtractedContentPackage(zipContentsPath, repoName) {
 
   if (!contentPackagePath && hasDirectories) {
     core.info('🔄 Detected extracted boilerplate content - creating package from directories');
-    return await createPackageFromExtractedContent(zipContentsPath, repoName);
-  } else if (contentPackagePath) {
+    return createPackageFromExtractedContent(zipContentsPath, repoName);
+  }
+  if (contentPackagePath) {
     core.info(`🔄 Found content package: ${contentPackagePath} - extracting and modifying`);
-    
+
     // Extract the content package
     const extractedDir = path.join(zipContentsPath, 'extracted_package');
     if (fs.existsSync(extractedDir)) {
@@ -471,10 +463,9 @@ async function modifyExtractedContentPackage(zipContentsPath, repoName) {
     core.info('✅ Content package extracted successfully');
 
     // Now process the extracted content
-    return await createPackageFromExtractedContent(extractedDir, repoName);
-  } else {
-    throw new Error('No content package found and no extracted boilerplate content detected');
+    return createPackageFromExtractedContent(extractedDir, repoName);
   }
+  throw new Error('No content package found and no extracted boilerplate content detected');
 }
 
 /**
@@ -495,9 +486,6 @@ async function modifyExtractedContentPackage(zipContentsPath, repoName) {
  * | *               | error_message        | Error if operation could not complete.| Output   |
  * | GET_PAGE_PATHS  | content_package_path | Path to content package zip file.     | Output   |
  * | GET_PAGE_PATHS  | page_paths           | Comma-delimited list of page paths.   | Output   |
- * | DETECT_BOILERPLATE | is_boilerplate    | Whether package is boilerplate.       | Output   |
- * | DETECT_BOILERPLATE | content_package_path | Path to content package zip file.  | Output   |
- * | DETECT_BOILERPLATE | page_paths        | Comma-delimited list of page paths.   | Output   |
  * | CONVERT_BOILERPLATE | is_boilerplate   | Whether package is boilerplate.       | Output   |
  * | CONVERT_BOILERPLATE | content_package_path | Path to content package zip file. | Output   |
  * | CONVERT_BOILERPLATE | page_paths       | Comma-delimited list of page paths.   | Output   |
@@ -552,32 +540,18 @@ export async function run() {
       }
 
       await doExtractContentPaths(zipContentsPath);
-    } else if (operation === XWALK_OPERATIONS.DETECT_BOILERPLATE) {
-      // Detect if this is a boilerplate package
-      const result = await detectBoilerplate(zipContentsPath);
-      
-      // Set outputs for detection
-      core.setOutput('is_boilerplate', result.isBoilerplate.toString());
-      core.setOutput('content_package_path', result.contentPackagePath);
-      core.setOutput('page_paths', result.pagePaths.join(','));
-      
-      if (result.isBoilerplate) {
-        core.info(`✅ Detected boilerplate package with ${result.pagePaths.length} paths: ${result.pagePaths.join(', ')}`);
-      } else {
-        core.info(`✅ Not a boilerplate package. Found ${result.pagePaths.length} paths: ${result.pagePaths.join(', ')}`);
-      }
     } else if (operation === XWALK_OPERATIONS.CONVERT_BOILERPLATE) {
       // First detect if this is a boilerplate package
       const result = await detectBoilerplate(zipContentsPath);
-      
+
       // Set detection outputs
       core.setOutput('is_boilerplate', result.isBoilerplate.toString());
       core.setOutput('content_package_path', result.contentPackagePath);
-      core.setOutput('page_paths', result.pagePaths.join(','));
-      
+      core.setOutput('page_paths', result.pagePaths);
+
       if (result.isBoilerplate) {
         core.info(`✅ Detected boilerplate package with ${result.pagePaths.length} paths: ${result.pagePaths.join(', ')}`);
-        
+
         // Get repo name for conversion
         const repoName = getAndValidateInputs('repo_name');
         core.info('Package detected as boilerplate - starting conversion');
@@ -586,7 +560,7 @@ export async function run() {
         const convertedPackagePath = await modifyExtractedContentPackage(zipContentsPath, repoName);
 
         // Convert the page paths to repository-specific paths
-        const convertedPagePaths = result.pagePaths.map(originalPath => {
+        const convertedPagePaths = result.pagePaths.map((originalPath) => {
           // Convert ALL paths that contain 'sta-xwalk-boilerplate' to use the repo name
           if (originalPath.includes('sta-xwalk-boilerplate')) {
             return originalPath.replace(/sta-xwalk-boilerplate/g, repoName);

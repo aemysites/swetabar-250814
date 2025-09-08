@@ -570,7 +570,7 @@ export async function run() {
 
         // Set conversion outputs
         core.setOutput('converted_package_path', convertedPackagePath);
-        core.setOutput('converted_page_paths', JSON.stringify(convertedPagePaths));
+        core.setOutput('converted_page_paths', convertedPagePaths);
         core.info(`Boilerplate conversion completed. Converted package: ${convertedPackagePath}`);
         core.info(`Converted page paths: ${convertedPagePaths.join(', ')}`);
         core.info('Assets will be skipped during upload for boilerplate packages');

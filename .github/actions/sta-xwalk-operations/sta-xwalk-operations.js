@@ -112,14 +112,25 @@ const BOILERPLATE_PATHS = [
  */
 function isBoilerplatePackage(paths) {
   if (!paths || paths.length === 0) {
+    core.info('🔍 No paths provided for boilerplate detection');
     return false;
   }
 
+  core.info(`🔍 Checking ${paths.length} paths against boilerplate patterns:`);
+  core.info(`🔍 Boilerplate paths: ${JSON.stringify(BOILERPLATE_PATHS)}`);
+
   // Check if all paths start with any of the boilerplate paths
   function startsWithBoilerplate(pathItem) {
-    return BOILERPLATE_PATHS.some((boilerplatePath) => pathItem.startsWith(boilerplatePath));
+    const matches = BOILERPLATE_PATHS.some((boilerplatePath) => pathItem.startsWith(boilerplatePath));
+    if (!matches) {
+      core.info(`❌ NON-MATCHING PATH: "${pathItem}"`);
+    }
+    return matches;
   }
-  return paths.every(startsWithBoilerplate);
+  
+  const result = paths.every(startsWithBoilerplate);
+  core.info(`🔍 All paths match boilerplate patterns: ${result}`);
+  return result;
 }
 
 /**

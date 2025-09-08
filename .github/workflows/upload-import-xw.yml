@@ -84,7 +84,6 @@ jobs:
           cd ../sta-aem-publish
           npm install
 
-
       - name: '[Check] Validate inputs'
         if: ${{ env.errorMessage != '' }}
         uses: ./.github/actions/sta-status
@@ -120,35 +119,7 @@ jobs:
           status_type: error
           agent_name: upload-import-xw
 
-      - name: '[Progress] Check package type'
-        uses: ./.github/actions/sta-status
-        with:
-          callback_urls: ${{ github.event.inputs.aemy_callback_urls }}
-          context: ${{ github.event.inputs.aemy_context }}
-          message: Import zip extracted. Checking package type and converting if needed... (Step 2 of ${{ env.total_steps }}). ${{ env.ACTION_URL }}
-          status_type: progress
-          agent_name: upload-import-xw
-
-      - name: Detect and convert package
-        id: package-detection
-        uses: ./.github/actions/sta-xwalk-operations
-        with:
-          operation: convert-boilerplate
-          zip_contents_path: ${{ steps.download-zip.outputs.zip_contents_path }}
-          repo_name: ${{ github.event.repository.name }}
-
-      - name: '[Check] Package type detection'
-        if: ${{ steps.package-detection.outputs.error_message != '' }}
-        uses: ./.github/actions/sta-status
-        with:
-          callback_urls: ${{ github.event.inputs.aemy_callback_urls }}
-          context: ${{ github.event.inputs.aemy_context }}
-          message: ${{ steps.package-detection.outputs.error_message }} ${{ env.ACTION_URL }}
-          status_type: error
-          agent_name: upload-import-xw
-
       - name: '[Progress] Extract AEM contents'
-        if: ${{ steps.package-detection.outputs.is_boilerplate != 'true' }}
         uses: ./.github/actions/sta-status
         with:
           callback_urls: ${{ github.event.inputs.aemy_callback_urls }}
@@ -158,7 +129,6 @@ jobs:
           agent_name: upload-import-xw
 
       - name: Extract AEM contents
-        if: ${{ steps.package-detection.outputs.is_boilerplate != 'true' }}
         id: aem-content-paths
         uses: ./.github/actions/sta-xwalk-operations
         with:
@@ -166,7 +136,7 @@ jobs:
           zip_contents_path: ${{ steps.download-zip.outputs.zip_contents_path }}
 
       - name: '[Check] Extract AEM contents'
-        if: ${{ steps.package-detection.outputs.is_boilerplate != 'true' && steps.aem-content-paths.outputs.error_message != '' }}
+        if: ${{ steps.aem-content-paths.outputs.error_message != '' }}
         uses: ./.github/actions/sta-status
         with:
           callback_urls: ${{ github.event.inputs.aemy_callback_urls }}
@@ -174,8 +144,6 @@ jobs:
           message: ${{ steps.aem-content-paths.outputs.error_message }} ${{ env.ACTION_URL }}
           status_type: error
           agent_name: upload-import-xw
-
-
 
       - name: '[Progress] Get access token for AEM'
         uses: ./.github/actions/sta-status
@@ -212,7 +180,7 @@ jobs:
         with:
           callback_urls: ${{ github.event.inputs.aemy_callback_urls }}
           context: ${{ github.event.inputs.aemy_context }}
-          message: Content package ready. Now initiating upload${{ steps.package-detection.outputs.is_boilerplate == 'true' && ' (boilerplate with assets skipped)' || '' }}... (Step 4 of ${{ env.total_steps }}). ${{ env.ACTION_URL }}
+          message: Found AEM content package. Now initiating upload... (Step 4 of ${{ env.total_steps }}). ${{ env.ACTION_URL }}
           status_type: progress
           agent_name: upload-import-xw
 
@@ -223,9 +191,9 @@ jobs:
           operation: upload
           access_token: ${{ steps.get-access-token-for-aem.outputs.access_token }}
           aem_author_url: ${{ github.event.inputs.root_mountpoint }}
-          skip_assets: ${{ steps.package-detection.outputs.is_boilerplate == 'true' || github.event.inputs.skip_assets == 'true' }}
+          skip_assets: ${{ github.event.inputs.skip_assets }}
           zip_contents_path: ${{ steps.download-zip.outputs.zip_contents_path }}
-          content_package_path: ${{ steps.package-detection.outputs.converted_package_path || steps.package-detection.outputs.content_package_path || steps.aem-content-paths.outputs.content_package_path }}
+          content_package_path: ${{ steps.aem-content-paths.outputs.content_package_path }}
 
       - name: '[Check] Upload content to XWalk'
         if: ${{ steps.xwalk-upload-step.outputs.error_message != '' }}
@@ -252,7 +220,7 @@ jobs:
         with:
           access_token: ${{ steps.get-access-token-for-aem.outputs.access_token }}
           aem_url: ${{ github.event.inputs.root_mountpoint }}
-          page_paths: ${{ steps.package-detection.outputs.converted_page_paths || steps.package-detection.outputs.page_paths || steps.aem-content-paths.outputs.page_paths }}
+          page_paths: ${{ steps.aem-content-paths.outputs.page_paths }}
           is_preview: 'true'
 
       - name: '[Check] Replicate content to AEM Preview'
@@ -280,7 +248,7 @@ jobs:
         with:
           access_token: ${{ steps.get-access-token-for-aem.outputs.access_token }}
           aem_url: ${{ github.event.inputs.root_mountpoint }}
-          page_paths: ${{ steps.package-detection.outputs.converted_page_paths || steps.package-detection.outputs.page_paths || steps.aem-content-paths.outputs.page_paths }}
+          page_paths: ${{ steps.aem-content-paths.outputs.page_paths }}
           is_preview: 'false'
 
       - name: '[Check] Replicate content to AEM Publish'

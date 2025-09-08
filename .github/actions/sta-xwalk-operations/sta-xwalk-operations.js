@@ -157,6 +157,44 @@ export async function run() {
       }
 
       await doExtractContentPaths(zipContentsPath);
+    } else if (operation === XWALK_OPERATIONS.CONVERT_BOILERPLATE) {
+      // First detect if this is a boilerplate package
+      const result = await detectBoilerplate(zipContentsPath);
+
+      // Set detection outputs
+      core.setOutput('is_boilerplate', result.isBoilerplate.toString());
+      core.setOutput('content_package_path', result.contentPackagePath);
+      core.setOutput('page_paths', JSON.stringify(result.pagePaths));
+
+      if (result.isBoilerplate) {
+        core.info(`✅ Detected boilerplate package with ${result.pagePaths.length} paths: ${result.pagePaths.join(', ')}`);
+
+        // Get repo name for conversion
+        const repoName = getAndValidateInputs('repo_name');
+        core.info('Package detected as boilerplate - starting conversion');
+
+        // Convert the boilerplate content
+        const convertedPackagePath = await modifyExtractedContentPackage(zipContentsPath, repoName);
+
+        // Convert the page paths to repository-specific paths
+        const convertedPagePaths = result.pagePaths.map((originalPath) => {
+          // Convert ALL paths that contain 'sta-xwalk-boilerplate' to use the repo name
+          if (originalPath.includes('sta-xwalk-boilerplate')) {
+            return originalPath.replace(/sta-xwalk-boilerplate/g, repoName);
+          }
+          return originalPath; // Keep original if not a boilerplate path
+        });
+
+        // Set conversion outputs
+        core.setOutput('converted_package_path', convertedPackagePath);
+        core.setOutput('converted_page_paths', JSON.stringify(convertedPagePaths));
+        core.info(`Boilerplate conversion completed. Converted package: ${convertedPackagePath}`);
+        core.info(`Converted page paths: ${convertedPagePaths.join(', ')}`);
+        core.info('Assets will be skipped during upload for boilerplate packages');
+      } else {
+        core.info(`✅ Not a boilerplate package. Found ${result.pagePaths.length} paths: ${result.pagePaths.join(', ')}`);
+        core.info('Package is not a boilerplate - no conversion needed');
+      }
     }
   } catch (error) {
     core.warning(`Error: XWalk operation ${operation} failed: ${error.message}`);

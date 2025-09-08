@@ -17,17 +17,33 @@ import unzipper from 'unzipper';
 
 /**
  * Get the list of paths from a filter.xml file.
+ * Enhanced to handle multiple XML formats.
  * @param {string} xmlString
  * @returns {string[]}
  */
 export function getFilterPaths(xmlString) {
-  const lines = xmlString.split('\n');
   const paths = [];
 
-  for (const line of lines) {
-    const match = line.match(/^\s*<filter\s+root="([^"]+)"><\/filter>\s*$/);
-    if (match) {
-      paths.push(match[1]);
+  // Try multiple regex patterns to handle different XML formats
+  const patterns = [
+    // Self-closing filter tags: <filter root="/path"/>
+    /<filter\s+root="([^"]+)"\s*\/>/g,
+    // Opening and closing filter tags: <filter root="/path"></filter>
+    /<filter\s+root="([^"]+)"><\/filter>/g,
+    // Opening and closing filter tags with content: <filter root="/path">...</filter>
+    /<filter\s+root="([^"]+)"[^>]*>.*?<\/filter>/g,
+    // Filter tags with other attributes
+    /<filter[^>]+root="([^"]+)"[^>]*>/g,
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    // eslint-disable-next-line no-cond-assign
+    while ((match = pattern.exec(xmlString)) !== null) {
+      const filterPath = match[1];
+      if (filterPath && !paths.includes(filterPath)) {
+        paths.push(filterPath);
+      }
     }
   }
 

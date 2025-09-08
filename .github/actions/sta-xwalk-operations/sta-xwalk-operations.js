@@ -17,7 +17,7 @@ import path from 'path';
 import unzipper from 'unzipper';
 // eslint-disable-next-line import/no-unresolved, import/no-extraneous-dependencies
 import archiver from 'archiver';
-import { doExtractContentPaths } from './xwalk-content.js';
+import { doExtractContentPaths, getFilterPaths } from './xwalk-content.js';
 
 export const XWALK_OPERATIONS = Object.freeze({
   UPLOAD: 'upload',
@@ -104,39 +104,6 @@ const BOILERPLATE_PATHS = [
   '/content/dam/sta-xwalk-boilerplate/block-collection',
 ];
 
-/**
- * Get the list of paths from a filter.xml file.
- * @param {string} xmlString
- * @returns {string[]}
- */
-function getFilterPaths(xmlString) {
-  const paths = [];
-
-  // Try multiple regex patterns to handle different XML formats
-  const patterns = [
-    // Self-closing filter tags: <filter root="/path"/>
-    /<filter\s+root="([^"]+)"\s*\/>/g,
-    // Opening and closing filter tags: <filter root="/path"></filter>
-    /<filter\s+root="([^"]+)"><\/filter>/g,
-    // Opening and closing filter tags with content: <filter root="/path">...</filter>
-    /<filter\s+root="([^"]+)"[^>]*>.*?<\/filter>/g,
-    // Filter tags with other attributes
-    /<filter[^>]+root="([^"]+)"[^>]*>/g,
-  ];
-
-  for (const pattern of patterns) {
-    let match;
-    // eslint-disable-next-line no-cond-assign
-    while ((match = pattern.exec(xmlString)) !== null) {
-      const filterPath = match[1];
-      if (filterPath && !paths.includes(filterPath)) {
-        paths.push(filterPath);
-      }
-    }
-  }
-
-  return paths;
-}
 
 /**
  * Check if all the given paths start with any of the BOILERPLATE_PATHS

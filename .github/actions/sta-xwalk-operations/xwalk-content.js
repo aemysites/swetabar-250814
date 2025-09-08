@@ -20,7 +20,7 @@ import unzipper from 'unzipper';
  * @param {string} xmlString
  * @returns {string[]}
  */
-function getFilterPaths(xmlString) {
+export function getFilterPaths(xmlString) {
   const lines = xmlString.split('\n');
   const paths = [];
 

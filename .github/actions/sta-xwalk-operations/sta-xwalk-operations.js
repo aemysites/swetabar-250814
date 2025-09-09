@@ -104,7 +104,6 @@ const BOILERPLATE_PATHS = [
   '/content/dam/sta-xwalk-boilerplate/block-collection',
 ];
 
-
 /**
  * Check if all the given paths start with any of the BOILERPLATE_PATHS
  * @param {string[]} paths - Array of paths from filter.xml
@@ -112,25 +111,14 @@ const BOILERPLATE_PATHS = [
  */
 function isBoilerplatePackage(paths) {
   if (!paths || paths.length === 0) {
-    core.info('🔍 No paths provided for boilerplate detection');
     return false;
   }
 
-  core.info(`🔍 Checking ${paths.length} paths against boilerplate patterns:`);
-  core.info(`🔍 Boilerplate paths: ${JSON.stringify(BOILERPLATE_PATHS)}`);
-
   // Check if all paths start with any of the boilerplate paths
   function startsWithBoilerplate(pathItem) {
-    const matches = BOILERPLATE_PATHS.some((boilerplatePath) => pathItem.startsWith(boilerplatePath));
-    if (!matches) {
-      core.info(`❌ NON-MATCHING PATH: "${pathItem}"`);
-    }
-    return matches;
+    return BOILERPLATE_PATHS.some((boilerplatePath) => pathItem.startsWith(boilerplatePath));
   }
-  
-  const result = paths.every(startsWithBoilerplate);
-  core.info(`🔍 All paths match boilerplate patterns: ${result}`);
-  return result;
+  return paths.every(startsWithBoilerplate);
 }
 
 /**
@@ -265,6 +253,102 @@ function convertBoilerplatePaths(filterXmlContent, repoName) {
 }
 
 /**
+ * Process all .content.xml files recursively and replace boilerplate paths.
+ * This function is only called for boilerplate packages during conversion.
+ * @param {string} jcrRootPath - Path to jcr_root directory
+ * @param {string} repoName - Repository name to use for replacement
+ */
+function processContentXmlFiles(jcrRootPath, repoName) {
+  core.info('Processing .content.xml files in jcr_root for path replacement');
+
+  /**
+   * Recursively find all .content.xml files
+   * @param {string} dirPath - Directory to search
+   * @returns {string[]} - Array of .content.xml file paths
+   */
+  function findContentXmlFiles(dirPath) {
+    const contentXmlFiles = [];
+
+    if (!fs.existsSync(dirPath)) {
+      return contentXmlFiles;
+    }
+
+    const items = fs.readdirSync(dirPath);
+
+    for (const item of items) {
+      const itemPath = path.join(dirPath, item);
+      const stat = fs.statSync(itemPath);
+
+      if (stat.isDirectory()) {
+        // Recursively search subdirectories
+        contentXmlFiles.push(...findContentXmlFiles(itemPath));
+      } else if (item === '.content.xml') {
+        contentXmlFiles.push(itemPath);
+      }
+    }
+
+    return contentXmlFiles;
+  }
+
+  const contentXmlFiles = findContentXmlFiles(jcrRootPath);
+  core.info(`Found ${contentXmlFiles.length} .content.xml files to process`);
+
+  let totalReplacements = 0;
+
+  for (const filePath of contentXmlFiles) {
+    try {
+      const originalContent = fs.readFileSync(filePath, 'utf8');
+      let modifiedContent = originalContent;
+      let fileReplacements = 0;
+
+      // Replace paths that start with /content/dam/sta-xwalk-boilerplate/
+      const damPattern = /\/content\/dam\/sta-xwalk-boilerplate\//g;
+      const damMatches = originalContent.match(damPattern);
+      if (damMatches) {
+        modifiedContent = modifiedContent.replace(damPattern, `/content/dam/${repoName}/`);
+        fileReplacements += damMatches.length;
+      }
+
+      // Replace paths that start with /content/sta-xwalk-boilerplate/
+      const contentPattern = /\/content\/sta-xwalk-boilerplate\//g;
+      const contentMatches = originalContent.match(contentPattern);
+      if (contentMatches) {
+        modifiedContent = modifiedContent.replace(contentPattern, `/content/${repoName}/`);
+        fileReplacements += contentMatches.length;
+      }
+
+      // Also handle exact matches without trailing slash
+      const exactDamPattern = /\/content\/dam\/sta-xwalk-boilerplate(?=[\s"'<>])/g;
+      const exactDamMatches = originalContent.match(exactDamPattern);
+      if (exactDamMatches) {
+        modifiedContent = modifiedContent.replace(exactDamPattern, `/content/dam/${repoName}`);
+        fileReplacements += exactDamMatches.length;
+      }
+
+      const exactContentPattern = /\/content\/sta-xwalk-boilerplate(?=[\s"'<>])/g;
+      const exactContentMatches = originalContent.match(exactContentPattern);
+      if (exactContentMatches) {
+        modifiedContent = modifiedContent.replace(exactContentPattern, `/content/${repoName}`);
+        fileReplacements += exactContentMatches.length;
+      }
+
+      // Write back the modified content if changes were made
+      if (fileReplacements > 0) {
+        fs.writeFileSync(filePath, modifiedContent, 'utf8');
+        totalReplacements += fileReplacements;
+        const relativePath = path.relative(jcrRootPath, filePath);
+        core.info(`  ✅ Updated ${relativePath}: ${fileReplacements} replacements`);
+      }
+    } catch (error) {
+      const relativePath = path.relative(jcrRootPath, filePath);
+      core.warning(`  ⚠️ Failed to process ${relativePath}: ${error.message}`);
+    }
+  }
+
+  core.info(`✅ Completed processing .content.xml files: ${totalReplacements} total path replacements made`);
+}
+
+/**
  * Rename folders in jcr_root from sta-xwalk-boilerplate to repo name
  * @param {string} jcrRootPath - Path to jcr_root directory
  * @param {string} repoName - Repository name to use
@@ -376,6 +460,10 @@ async function createPackageFromExtractedContent(zipContentsPath, repoName) {
 
   // Rename folders in jcr_root
   renameFoldersInJcrRoot(jcrRootPath, repoName);
+
+  // Process all .content.xml files to replace boilerplate paths (only for boilerplate packages)
+  core.info('🔄 Processing .content.xml files for boilerplate path replacement...');
+  processContentXmlFiles(jcrRootPath, repoName);
 
   // Create new zip with modified content - only include jcr_root and META-INF
   const convertedPackagePath = path.join(zipContentsPath, `converted-boilerplate-${repoName}.zip`);
